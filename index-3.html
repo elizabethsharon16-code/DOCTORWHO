@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Doctor Who RPG</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #020a0f;
+    --terminal: #041420;
+    --blue: #00d4ff;
+    --blue-dim: #007a99;
+    --blue-glow: rgba(0,212,255,0.15);
+    --gold: #ffd700;
+    --red: #ff4444;
+    --green: #00ff88;
+    --text: #b0d8e8;
+    --dim: #4a7a8a;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 20px;
+    background-image: 
+      radial-gradient(ellipse at 20% 50%, rgba(0,60,100,0.3) 0%, transparent 60%),
+      radial-gradient(ellipse at 80% 20%, rgba(0,100,150,0.2) 0%, transparent 50%);
+  }
+
+  .scanlines {
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.08) 2px,
+      rgba(0,0,0,0.08) 4px
+    );
+    pointer-events: none;
+    z-index: 100;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 24px;
+    width: 100%;
+    max-width: 760px;
+  }
+
+  .title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: clamp(1.6rem, 5vw, 2.8rem);
+    font-weight: 900;
+    color: var(--blue);
+    text-shadow: 0 0 20px var(--blue), 0 0 60px rgba(0,212,255,0.4);
+    letter-spacing: 0.15em;
+    animation: flicker 8s infinite;
+  }
+
+  .subtitle {
+    font-size: 0.75rem;
+    color: var(--dim);
+    letter-spacing: 0.3em;
+    margin-top: 6px;
+  }
+
+  @keyframes flicker {
+    0%, 95%, 100% { opacity: 1; }
+    96% { opacity: 0.8; }
+    97% { opacity: 1; }
+    98% { opacity: 0.6; }
+    99% { opacity: 1; }
+  }
+
+  .game-container {
+    width: 100%;
+    max-width: 760px;
+    background: var(--terminal);
+    border: 1px solid var(--blue-dim);
+    border-radius: 4px;
+    box-shadow: 0 0 40px rgba(0,212,255,0.1), inset 0 0 40px rgba(0,0,0,0.5);
+    overflow: hidden;
+  }
+
+  .terminal-bar {
+    background: rgba(0,212,255,0.05);
+    border-bottom: 1px solid var(--blue-dim);
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.7rem;
+    color: var(--dim);
+    letter-spacing: 0.1em;
+  }
+
+  .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .dot-r { background: #ff5f57; }
+  .dot-y { background: #ffbd2e; }
+  .dot-g { background: #28c940; }
+
+  .output {
+    padding: 20px;
+    min-height: 320px;
+    max-height: 420px;
+    overflow-y: auto;
+    font-size: 0.88rem;
+    line-height: 1.7;
+    scroll-behavior: smooth;
+  }
+
+  .output::-webkit-scrollbar { width: 4px; }
+  .output::-webkit-scrollbar-track { background: transparent; }
+  .output::-webkit-scrollbar-thumb { background: var(--blue-dim); border-radius: 2px; }
+
+  .line { margin: 2px 0; animation: fadeIn 0.15s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+
+  .line-system { color: var(--blue); }
+  .line-warning { color: var(--gold); }
+  .line-damage { color: var(--red); }
+  .line-heal { color: var(--green); }
+  .line-action { color: #fff; }
+  .line-monster { color: #ff8866; }
+  .line-victory { color: var(--gold); font-size: 1rem; text-shadow: 0 0 10px var(--gold); }
+  .line-defeat { color: var(--red); font-size: 1rem; text-shadow: 0 0 10px var(--red); }
+  .line-dim { color: var(--dim); }
+  .line-wolf { color: #cc88ff; text-shadow: 0 0 10px rgba(200,100,255,0.8); }
+
+  .divider { border: none; border-top: 1px solid rgba(0,212,255,0.15); margin: 10px 0; }
+
+  /* HUD */
+  .hud {
+    display: none;
+    padding: 12px 20px;
+    background: rgba(0,0,0,0.3);
+    border-top: 1px solid rgba(0,212,255,0.1);
+    border-bottom: 1px solid rgba(0,212,255,0.1);
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+
+  .hud.visible { display: flex; }
+
+  .hud-block { display: flex; flex-direction: column; gap: 4px; }
+  .hud-label { font-size: 0.65rem; color: var(--dim); letter-spacing: 0.2em; }
+  .hud-value { font-family: 'Orbitron', sans-serif; font-size: 0.85rem; color: var(--blue); }
+
+  .hp-bar {
+    width: 120px;
+    height: 6px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .hp-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.4s ease;
+  }
+  .hp-fill.player { background: var(--green); }
+  .hp-fill.enemy { background: var(--red); }
+
+  /* Choices */
+  .choices {
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .choices-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .choice-btn {
+    background: transparent;
+    border: 1px solid var(--blue-dim);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.82rem;
+    padding: 10px 14px;
+    cursor: pointer;
+    text-align: left;
+    border-radius: 2px;
+    transition: all 0.15s ease;
+    letter-spacing: 0.05em;
+  }
+
+  .choice-btn:hover {
+    background: var(--blue-glow);
+    border-color: var(--blue);
+    color: #fff;
+    box-shadow: 0 0 12px rgba(0,212,255,0.2);
+  }
+
+  .choice-btn:active { transform: scale(0.98); }
+
+  .choice-btn.wolf {
+    border-color: #7733aa;
+    color: #cc88ff;
+    grid-column: 1 / -1;
+  }
+  .choice-btn.wolf:hover {
+    background: rgba(150,50,200,0.15);
+    border-color: #cc88ff;
+    box-shadow: 0 0 12px rgba(200,100,255,0.3);
+  }
+
+  .choice-btn.restart {
+    border-color: var(--gold);
+    color: var(--gold);
+    width: 100%;
+  }
+
+  /* Companion select grid */
+  .companion-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .companion-card {
+    background: transparent;
+    border: 1px solid var(--blue-dim);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    padding: 16px;
+    cursor: pointer;
+    border-radius: 2px;
+    text-align: left;
+    transition: all 0.15s ease;
+  }
+
+  .companion-card:hover {
+    background: var(--blue-glow);
+    border-color: var(--blue);
+    box-shadow: 0 0 16px rgba(0,212,255,0.2);
+  }
+
+  .companion-name {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.8rem;
+    color: var(--blue);
+    margin-bottom: 4px;
+  }
+
+  .companion-stats {
+    font-size: 0.7rem;
+    color: var(--dim);
+    line-height: 1.6;
+  }
+
+  .exit-btn {
+    background: transparent;
+    border: 1px solid #333;
+    color: var(--dim);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.75rem;
+    padding: 8px;
+    cursor: pointer;
+    width: 100%;
+    margin-top: 4px;
+    transition: all 0.15s;
+    letter-spacing: 0.1em;
+  }
+
+  .exit-btn:hover { border-color: var(--red); color: var(--red); }
+
+  .prompt-label {
+    font-size: 0.7rem;
+    color: var(--dim);
+    letter-spacing: 0.2em;
+    margin-bottom: 8px;
+  }
+
+  @keyframes tardis-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  .spin { display: inline-block; animation: tardis-spin 1s linear infinite; }
+</style>
+</head>
+<body>
+<div class="scanlines"></div>
+
+<header>
+  <div class="title">◈ DOCTOR WHO RPG ◈</div>
+  <div class="subtitle">TARDIS COMBAT INTERFACE v4.2 · GALLIFREYAN SYSTEMS</div>
+</header>
+
+<div class="game-container">
+  <div class="terminal-bar">
+    <div class="dot dot-r"></div>
+    <div class="dot dot-y"></div>
+    <div class="dot dot-g"></div>
+    <span style="margin-left:8px;">tardis://combat.interface — active session</span>
+  </div>
+
+  <div class="output" id="output"></div>
+
+  <div class="hud" id="hud">
+    <div class="hud-block">
+      <div class="hud-label">COMPANION</div>
+      <div class="hud-value" id="hud-companion">—</div>
+      <div class="hp-bar"><div class="hp-fill player" id="hud-player-hp" style="width:100%"></div></div>
+      <div class="hud-value" id="hud-player-hp-val" style="font-size:0.7rem">— HP</div>
+    </div>
+    <div class="hud-block">
+      <div class="hud-label">ENEMY</div>
+      <div class="hud-value" id="hud-enemy">—</div>
+      <div class="hp-bar"><div class="hp-fill enemy" id="hud-enemy-hp" style="width:100%"></div></div>
+      <div class="hud-value" id="hud-enemy-hp-val" style="font-size:0.7rem">— HP</div>
+    </div>
+    <div class="hud-block" style="margin-left:auto">
+      <div class="hud-label">TURN</div>
+      <div class="hud-value" id="hud-turn">1</div>
+    </div>
+  </div>
+
+  <div class="choices" id="choices"></div>
+</div>
+
+<script>
+// ─── GAME STATE ───────────────────────────────────────────────────
+const state = {
+  companion: null,
+  enemy: null,
+  enemyMaxHp: 50,
+  hasVantage: false,
+  lastActionWasVantage: false,
+  playerIsStunned: false,
+  isDefending: false,
+  isStunned: false,
+  turnCount: 0,
+  phase: 'select' // select | battle | end
+};
+
+// ─── COMPANION DEFINITIONS ────────────────────────────────────────
+const companions = {
+  rose: {
+    name: 'Rose Tyler',
+    hp: 100, maxHp: 100,
+    doctorAffinity: 0.30,
+    dodgeRate: 0.0,
+    damageResist: 0.0,
+    bonusDmg: 0,
+    badWolf: 0.15,
+    desc: 'Bad Wolf · 30% Doctor · Vortex power'
+  },
+  donna: {
+    name: 'Donna Noble',
+    hp: 120, maxHp: 120,
+    doctorAffinity: 0.20,
+    dodgeRate: 0.0,
+    damageResist: 0.10,
+    bonusDmg: 0,
+    badWolf: 0,
+    desc: 'Tank · 120 HP · 10% damage resist'
+  },
+  amy: {
+    name: 'Amy Pond',
+    hp: 100, maxHp: 100,
+    doctorAffinity: 0.25,
+    dodgeRate: 0.10,
+    damageResist: 0.0,
+    bonusDmg: 0,
+    badWolf: 0,
+    desc: 'Nimble · 10% dodge · 25% Doctor'
+  },
+  clara: {
+    name: 'Clara Oswald',
+    hp: 100, maxHp: 100,
+    doctorAffinity: 0.35,
+    dodgeRate: 0.0,
+    damageResist: 0.0,
+    bonusDmg: 5,
+    badWolf: 0,
+    desc: 'Clever · +5 base dmg · 35% Doctor'
+  }
+};
+
+// ─── MONSTER DEFINITIONS ──────────────────────────────────────────
+const monsters = [
+  { type: 'Dalek',        hp: 50, maxHp: 50, damage: 15, gadgetWeakness: true,  thiefMode: false, trapDefense: false, fleePenalty: false, openingBonus: 0 },
+  { type: 'Cyberman',     hp: 60, maxHp: 60, damage: 12, gadgetWeakness: false, thiefMode: true,  trapDefense: false, fleePenalty: false, openingBonus: 0 },
+  { type: 'Weeping Angel',hp: 40, maxHp: 40, damage: 15, gadgetWeakness: false, thiefMode: false, trapDefense: true,  fleePenalty: false, openingBonus: 0 },
+  { type: 'Silence',      hp: 50, maxHp: 50, damage: 10, gadgetWeakness: false, thiefMode: false, trapDefense: false, fleePenalty: true,  openingBonus: 0 }
+];
+
+// ─── SORTED THREAT LIST (bubble sort) ────────────────────────────
+function bubbleSort(arr) {
+  const list = arr.map(m => ({...m}));
+  for (let i = 0; i < list.length - 1; i++)
+    for (let j = 0; j < list.length - 1 - i; j++)
+      if (list[j].hp > list[j+1].hp)
+        [list[j], list[j+1]] = [list[j+1], list[j]];
+  return list;
+}
+
+// ─── OUTPUT HELPERS ───────────────────────────────────────────────
+const output = document.getElementById('output');
+const choices = document.getElementById('choices');
+
+function print(text, cls = '') {
+  const line = document.createElement('div');
+  line.className = 'line' + (cls ? ' line-' + cls : '');
+  line.textContent = text;
+  output.appendChild(line);
+  output.scrollTop = output.scrollHeight;
+}
+
+function printDivider() {
+  const hr = document.createElement('hr');
+  hr.className = 'divider';
+  output.appendChild(hr);
+}
+
+function clearOutput() { output.innerHTML = ''; }
+function clearChoices() { choices.innerHTML = ''; }
+
+function updateHud() {
+  const c = state.companion;
+  const e = state.enemy;
+  if (!c || !e) return;
+  document.getElementById('hud-companion').textContent = c.name.split(' ')[0].toUpperCase();
+  document.getElementById('hud-enemy').textContent = e.type.toUpperCase();
+  document.getElementById('hud-player-hp').style.width = Math.max(0, (c.hp / c.maxHp) * 100) + '%';
+  document.getElementById('hud-enemy-hp').style.width = Math.max(0, (e.hp / e.maxHp) * 100) + '%';
+  document.getElementById('hud-player-hp-val').textContent = Math.max(0, c.hp) + ' HP';
+  document.getElementById('hud-enemy-hp-val').textContent = Math.max(0, e.hp) + ' HP';
+  document.getElementById('hud-turn').textContent = state.turnCount;
+}
+
+// ─── PHASE: SELECT COMPANION ──────────────────────────────────────
+function showSelectScreen() {
+  state.phase = 'select';
+  document.getElementById('hud').classList.remove('visible');
+  clearOutput();
+
+  const sorted = bubbleSort(monsters);
+  print('TARDIS THREAT ANALYSIS — SORTED BY HP', 'system');
+  sorted.forEach(m => print(`  ${m.type.padEnd(16)} ${m.hp} HP`, 'dim'));
+  printDivider();
+  print('SELECT YOUR COMPANION', 'system');
+  print('');
+
+  clearChoices();
+  const wrap = document.createElement('div');
+
+  const label = document.createElement('div');
+  label.className = 'prompt-label';
+  label.textContent = '> WHO TRAVELS WITH YOU?';
+  choices.appendChild(label);
+
+  const grid = document.createElement('div');
+  grid.className = 'companion-grid';
+
+  Object.entries(companions).forEach(([key, c]) => {
+    const btn = document.createElement('button');
+    btn.className = 'companion-card';
+    btn.innerHTML = `<div class="companion-name">${c.name.toUpperCase()}</div><div class="companion-stats">${c.desc}</div>`;
+    btn.onclick = () => selectCompanion(key);
+    grid.appendChild(btn);
+  });
+
+  choices.appendChild(grid);
+
+  const exitBtn = document.createElement('button');
+  exitBtn.className = 'exit-btn';
+  exitBtn.textContent = '[ EXIT TARDIS ]';
+  exitBtn.onclick = () => {
+    clearOutput();
+    clearChoices();
+    print('Thanks for playing. Allons-y!', 'dim');
+  };
+  choices.appendChild(exitBtn);
+}
+
+function selectCompanion(key) {
+  const base = companions[key];
+  state.companion = { ...base };
+  state.enemy = { ...monsters[Math.floor(Math.random() * monsters.length)] };
+  state.enemyMaxHp = state.enemy.maxHp;
+  state.hasVantage = false;
+  state.lastActionWasVantage = false;
+  state.playerIsStunned = false;
+  state.turnCount = 0;
+  startBattle();
+}
+
+// ─── PHASE: BATTLE ────────────────────────────────────────────────
+function startBattle() {
+  state.phase = 'battle';
+  document.getElementById('hud').classList.add('visible');
+  clearOutput();
+
+  const c = state.companion;
+  const e = state.enemy;
+
+  print(`Hello, ${c.name}. Allons-y!`, 'system');
+  printDivider();
+  print(`A ${e.type.toUpperCase()} APPEARS!`, 'monster');
+  print(`${e.type} HP: ${e.hp} | Attack: ${e.damage}`, 'dim');
+  printDivider();
+  print(`BATTLE START: ${c.name} vs ${e.type.toUpperCase()}`, 'system');
+  print('');
+
+  updateHud();
+  nextTurn();
+}
+
+function nextTurn() {
+  const c = state.companion;
+  const e = state.enemy;
+
+  if (c.hp <= 0 || e.hp <= 0) { endBattle(); return; }
+
+  state.turnCount++;
+  state.isDefending = false;
+  state.isStunned = false;
+  updateHud();
+
+  if (state.playerIsStunned) {
+    print(`>> ${c.name} is recovering from the Vortex — skipping turn!`, 'warning');
+    state.playerIsStunned = false;
+    monsterTurn();
+    return;
+  }
+
+  // Doctor intervention
+  if (Math.random() < c.doctorAffinity) {
+    const abilities = ['heal', 'boost', 'shield', 'distract'];
+    const ability = abilities[Math.floor(Math.random() * abilities.length)];
+    print(`>> VWORP VWORP! The Doctor helps with ${ability.toUpperCase()}!`, 'system');
+
+    if (ability === 'heal') {
+      c.hp = Math.min(c.maxHp, c.hp + 20);
+      print(`>> Rejuvenated! HP: ${c.hp}`, 'heal');
+    } else if (ability === 'boost') {
+      c.bonusDmg += 5;
+      print(`>> Permanent +5 damage boost!`, 'heal');
+    } else if (ability === 'shield') {
+      state.isDefending = true;
+      print(`>> A TARDIS shield surrounds you!`, 'heal');
+    } else if (ability === 'distract') {
+      state.isStunned = true;
+      print(`>> The Doctor distracts the ${e.type}!`, 'heal');
+    }
+    updateHud();
+  }
+
+  showBattleChoices();
+}
+
+function showBattleChoices() {
+  clearChoices();
+  const c = state.companion;
+  const e = state.enemy;
+
+  const label = document.createElement('div');
+  label.className = 'prompt-label';
+  label.textContent = `> TURN ${state.turnCount} — CHOOSE ACTION:`;
+  choices.appendChild(label);
+
+  const grid = document.createElement('div');
+  grid.className = 'choices-grid';
+
+  const actions = [
+    { label: '⚔  ATTACK', fn: doAttack },
+    { label: '🛡  DEFEND', fn: doDefend },
+    { label: '🔧  SONIC SCREWDRIVER', fn: doSonic },
+    { label: '👁  RUN FOR VANTAGE', fn: doVantage }
+  ];
+
+  actions.forEach(a => {
+    const btn = document.createElement('button');
+    btn.className = 'choice-btn';
+    btn.textContent = a.label;
+    btn.onclick = a.fn;
+    grid.appendChild(btn);
+  });
+
+  choices.appendChild(grid);
+
+  if (c.name === 'Rose Tyler') {
+    const wolfBtn = document.createElement('button');
+    wolfBtn.className = 'choice-btn wolf';
+    wolfBtn.textContent = '✧  UNLEASH THE VORTEX (BAD WOLF)';
+    wolfBtn.onclick = doBadWolf;
+    choices.appendChild(wolfBtn);
+  }
+}
+
+function doAttack() {
+  clearChoices();
+  const c = state.companion;
+  const e = state.enemy;
+  let damage = 10 + c.bonusDmg;
+
+  if (state.hasVantage) {
+    damage *= 2;
+    print(`>> CRITICAL HIT! Vantage point used!`, 'action');
+    if (e.trapDefense) {
+      damage = Math.floor(damage / 2);
+      print(`>> The ${e.type} moved while you weren't looking! Damage halved!`, 'warning');
+    }
+    state.hasVantage = false;
+    state.lastActionWasVantage = false;
+  }
+
+  e.hp -= damage;
+  print(`>> CLANG! You deal ${damage} damage to the ${e.type}!`, 'action');
+  updateHud();
+
+  if (e.hp <= 0) { endBattle(); return; }
+  monsterTurn();
+}
+
+function doDefend() {
+  clearChoices();
+  state.isDefending = true;
+  state.lastActionWasVantage = false;
+  print(`>> ${state.companion.name} braces for impact!`, 'action');
+  monsterTurn();
+}
+
+function doSonic() {
+  clearChoices();
+  const e = state.enemy;
+  state.isStunned = true;
+  state.lastActionWasVantage = false;
+  print(`>> BZZT! The ${e.type} is short-circuited!`, 'action');
+
+  if (e.gadgetWeakness) {
+    e.hp -= 10;
+    print(`>> The ${e.type}'s casing crackles! -10 HP`, 'heal');
+    updateHud();
+  }
+
+  if (e.hp <= 0) { endBattle(); return; }
+  monsterTurn();
+}
+
+function doVantage() {
+  clearChoices();
+  const c = state.companion;
+  const e = state.enemy;
+
+  if (state.lastActionWasVantage) {
+    print(`>> Already at the highest point! Choose a different action.`, 'warning');
+    showBattleChoices();
+    return;
+  }
+
+  state.hasVantage = true;
+  state.lastActionWasVantage = true;
+  print(`>> ${c.name} finds the highest vantage point!`, 'action');
+
+  if (e.fleePenalty) {
+    c.hp -= 5;
+    print(`>> You forgot the ${e.type} while running! -5 mental damage.`, 'damage');
+    updateHud();
+  }
+
+  monsterTurn();
+}
+
+function doBadWolf() {
+  clearChoices();
+  const c = state.companion;
+  const e = state.enemy;
+
+  if (Math.random() < c.badWolf) {
+    print('', '');
+    print('✧ ✧ ✧ ✧ ✧ ✧ ✧ ✧ ✧ ✧ ✧ ✧ ✧ ✧ ✧', 'wolf');
+    print('>> ROSE LOOKS INTO THE HEART OF THE TARDIS...', 'wolf');
+    print(">> 'I am the Bad Wolf. I create myself.'", 'wolf');
+    e.hp -= 50;
+    print(`>> The ${e.type} is unravelled by the time vortex for 50 damage!`, 'wolf');
+    print('✧ ✧ ✧ ✧ ✧ ✧ ✧ ✧ ✧ ✧ ✧ ✧ ✧ ✧ ✧', 'wolf');
+    updateHud();
+
+    if (e.hp <= 0) { endBattle(); return; }
+
+    print(`>> Rose reaches for the Vortex — it's too much! She is STUNNED!`, 'damage');
+    state.playerIsStunned = true;
+    monsterTurn();
+  } else {
+    print(`>> Rose tries to channel the Vortex... but it slips away. Not this time.`, 'warning');
+    monsterTurn();
+  }
+}
+
+function monsterTurn() {
+  const c = state.companion;
+  const e = state.enemy;
+
+  if (e.hp <= 0) { endBattle(); return; }
+
+  print('', '');
+
+  if (state.isStunned) {
+    print(`>> The ${e.type} is stunned and skips its turn!`, 'dim');
+  } else if (Math.random() < c.dodgeRate) {
+    print(`>> ${c.name} nimbly dodges the ${e.type}'s attack!`, 'heal');
+  } else {
+    let finalDmg = e.damage;
+
+    if (state.turnCount === 1 && e.openingBonus > 0) {
+      finalDmg += e.openingBonus;
+      print(`>> The ${e.type} launches a surprise strike! +${e.openingBonus} damage.`, 'monster');
+    }
+
+    if (e.thiefMode && state.hasVantage) {
+      state.hasVantage = false;
+      print(`>> The ${e.type} has UPGRADED and can track you! Vantage lost!`, 'warning');
+    }
+
+    if (c.damageResist > 0) finalDmg -= finalDmg * c.damageResist;
+    if (state.isDefending) {
+      finalDmg = Math.floor(finalDmg / 2);
+      print(`>> DEFENDED! Damage reduced to ${finalDmg}.`, 'heal');
+    }
+
+    finalDmg = Math.floor(finalDmg);
+    c.hp -= finalDmg;
+    print(`>> ${c.name} takes ${finalDmg} damage! HP: ${Math.max(0, c.hp)}`, 'damage');
+    updateHud();
+  }
+
+  print('');
+  printDivider();
+
+  if (c.hp <= 0) { endBattle(); return; }
+  nextTurn();
+}
+
+// ─── PHASE: END ───────────────────────────────────────────────────
+function endBattle() {
+  state.phase = 'end';
+  clearChoices();
+  const c = state.companion;
+  const e = state.enemy;
+
+  printDivider();
+  if (c.hp > 0) {
+    print('★ ★ ★ ★ ★  VICTORY  ★ ★ ★ ★ ★', 'victory');
+    print(`${c.name} and the Doctor have saved the timeline!`, 'victory');
+  } else {
+    print('! ! ! ! !  DEFEATED  ! ! ! ! !', 'defeat');
+    print(`${c.name} has fallen. The ${e.type} has won.`, 'defeat');
+  }
+  print('');
+
+  const restartBtn = document.createElement('button');
+  restartBtn.className = 'choice-btn restart';
+  restartBtn.textContent = '[ PLAY AGAIN — ENTER THE TARDIS ]';
+  restartBtn.onclick = showSelectScreen;
+  choices.appendChild(restartBtn);
+}
+
+// ─── START ────────────────────────────────────────────────────────
+showSelectScreen();
+</script>
+</body>
+</html>
